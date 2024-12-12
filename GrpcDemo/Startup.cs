@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Linq;
 
 namespace GrpcDemo
 {
@@ -45,7 +47,25 @@ namespace GrpcDemo
 
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapGet("/", async context => { await context.Response.WriteAsync("Hello World!"); });
+                endpoints.MapGet("/", async context =>
+                {
+                    var endpointDataSource = context
+                        .RequestServices.GetRequiredService<EndpointDataSource>();
+                    await context.Response.WriteAsJsonAsync(new
+                    {
+                        results = endpointDataSource
+                            .Endpoints
+                            .OfType<RouteEndpoint>()
+                            .Where(e => e.DisplayName?.StartsWith("gRPC") == true)
+                            .Select(e => new
+                            {
+                                name = e.DisplayName,
+                                pattern = e.RoutePattern.RawText,
+                                order = e.Order
+                            })
+                            .ToList()
+                    });
+                });
                 endpoints.MapGrpcService<Service>();
             });
         }
